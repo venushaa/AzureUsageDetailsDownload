@@ -1,0 +1,1240 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "type": "string",
+            "metadata": "Data Factory name",
+            "defaultValue": "usagedetails-df"
+        },
+        "AzureBlobStorage1_connectionString": {
+            "type": "secureString",
+            "metadata": "Secure string for 'connectionString' of 'AzureBlobStorage1'"
+        },
+        "AzureSqlDatabase1_connectionString": {
+            "type": "secureString",
+            "metadata": "Secure string for 'connectionString' of 'AzureSqlDatabase1'"
+        },
+        "trigger1UsageDetails_properties_pipeline_usageData_end2end_parameters_startDate": {
+            "type": "string",
+            "defaultValue": "2019-11-10"
+        },
+        "trigger1UsageDetails_properties_pipeline_usageData_end2end_parameters_endDate": {
+            "type": "string",
+            "defaultValue": "2019-11-10"
+        },
+        "trigger2UsageDetails_properties_pipelineBegin_parameters_startDate1": {
+            "type": "string",
+            "defaultValue": "12/1/2019"
+        },
+        "trigger2UsageDetails_properties_pipelineBegin_parameters_endDate1": {
+            "type": "string",
+            "defaultValue": "12/1/2019"
+        },
+        "trigger2UsageDetails_properties_pipelineBegin_parameters_interval": {
+            "type": "int",
+            "defaultValue": 4
+        },
+        "HttpServer1_properties_typeProperties_url": {
+            "type": "string",
+            "defaultValue": "@activity('Set Blobpath').value"
+        }
+    },
+    "variables": {
+        "factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('factoryName'), '/trigger1UsageDetails')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Stopped",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "pipeline_usageData_end2end",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {
+                            "startDate": "[parameters('trigger1UsageDetails_properties_pipeline_usageData_end2end_parameters_startDate')]",
+                            "endDate": "[parameters('trigger1UsageDetails_properties_pipeline_usageData_end2end_parameters_endDate')]"
+                        }
+                    }
+                ],
+                "type": "ScheduleTrigger",
+                "typeProperties": {
+                    "recurrence": {
+                        "frequency": "Hour",
+                        "interval": 6,
+                        "startTime": "2019-12-06T00:55:00Z",
+                        "timeZone": "UTC"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/pipeline_usageData_end2end')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/trigger2UsageDetails')]",
+            "type": "Microsoft.DataFactory/factories/triggers",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "runtimeState": "Stopped",
+                "pipelines": [
+                    {
+                        "pipelineReference": {
+                            "referenceName": "pipelineBegin",
+                            "type": "PipelineReference"
+                        },
+                        "parameters": {
+                            "startDate1": "[parameters('trigger2UsageDetails_properties_pipelineBegin_parameters_startDate1')]",
+                            "endDate1": "[parameters('trigger2UsageDetails_properties_pipelineBegin_parameters_endDate1')]",
+                            "interval": "[parameters('trigger2UsageDetails_properties_pipelineBegin_parameters_interval')]"
+                        }
+                    }
+                ],
+                "type": "ScheduleTrigger",
+                "typeProperties": {
+                    "recurrence": {
+                        "frequency": "Hour",
+                        "interval": 6,
+                        "startTime": "2019-12-17T00:45:00Z",
+                        "timeZone": "UTC"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/pipelines/pipelineBegin')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/AzureSqlTable_lookup')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "AzureSqlDatabase1",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "AzureSqlTable",
+                "schema": [
+                    {
+                        "name": "startDate",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "endDate",
+                        "type": "varchar"
+                    }
+                ],
+                "typeProperties": {
+                    "schema": "dbo",
+                    "table": "lookupDates"
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/BlobStorageForCSVFile')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "AzureBlobStorage1",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "startDate1": {
+                        "type": "string",
+                        "defaultValue": "pipeline().paramaters.startDate"
+                    },
+                    "endDate1": {
+                        "type": "string",
+                        "defaultValue": "pipeline().paramaters.endDate"
+                    }
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobStorageLocation",
+                        "fileName": {
+                            "value": "@concat(concat(concat('usageDetails', dataset().startDate1), dataset().endDate1), '.csv')",
+                            "type": "Expression"
+                        },
+                        "container": "usagedetailscontainer"
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\",\"",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/CSVFiletoTable')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "AzureBlobStorage1",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "startDate2": {
+                        "type": "string",
+                        "defaultValue": "pipeline().paramaters.startDate"
+                    },
+                    "endDate2": {
+                        "type": "string",
+                        "defaultValue": "pipeline().paramaters.endDate"
+                    }
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "AzureBlobStorageLocation",
+                        "fileName": {
+                            "value": "@concat(concat(concat('usageDetails', dataset().startDate2), dataset().endDate2), '.csv')",
+                            "type": "Expression"
+                        },
+                        "container": "usagedetailscontainer"
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\",\"",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": [
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    },
+                    {
+                        "type": "String"
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/AzureSqlTable1')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "AzureSqlDatabase1",
+                    "type": "LinkedServiceReference"
+                },
+                "parameters": {
+                    "startDate": {
+                        "type": "string",
+                        "defaultValue": "2019-11-01"
+                    },
+                    "endDate": {
+                        "type": "string",
+                        "defaultValue": "2019-11-01"
+                    }
+                },
+                "annotations": [],
+                "type": "AzureSqlTable",
+                "schema": [
+                    {
+                        "name": "AccountId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "AccountName",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "AccountOwnerEmail",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "AdditionalInfo",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ConsumedQuantity",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ConsumedService",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ConsumedServiceId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "Cost",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "CostCenter",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "Date",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "DepartmentId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "DepartmentName",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "InstanceId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "MeterCategory",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "MeterId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "MeterName",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "MeterRegion",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "MeterSubCategory",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "Product",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ProductId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ResourceGroup",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ResourceLocation",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ResourceLocationId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ResourceRate",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ServiceAdministratorId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ServiceInfo1",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ServiceInfo2",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "StoreServiceIdentifier",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "SubscriptionGuid",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "SubscriptionId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "SubscriptionName",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "Tags",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "UnitOfMeasure",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "PartNumber",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ResourceGuid",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "OfferId",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ChargesBilledSeparately",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "Location",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ServiceName",
+                        "type": "varchar"
+                    },
+                    {
+                        "name": "ServiceTier",
+                        "type": "varchar"
+                    }
+                ],
+                "typeProperties": {
+                    "schema": "dbo",
+                    "table": {
+                        "value": "@concat(concat('usageDetailsStaging',dataset().startDate),dataset().endDate)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/CSVSource')]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "HttpServer1",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "DelimitedText",
+                "typeProperties": {
+                    "location": {
+                        "type": "HttpServerLocation"
+                    },
+                    "columnDelimiter": ",",
+                    "escapeChar": "\",\"",
+                    "firstRowAsHeader": true,
+                    "quoteChar": "\""
+                },
+                "schema": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/HttpServer1')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/AzureBlobStorage1')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBlobStorage",
+                "typeProperties": {
+                    "connectionString": "[parameters('AzureBlobStorage1_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/AzureSqlDatabase1')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureSqlDatabase",
+                "typeProperties": {
+                    "connectionString": "[parameters('AzureSqlDatabase1_connectionString')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/HttpServer1')]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "HttpServer",
+                "typeProperties": {
+                    "url": "[parameters('HttpServer1_properties_typeProperties_url')]",
+                    "enableServerCertificateValidation": true,
+                    "authenticationType": "Anonymous"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pipeline_usageData_end2end')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "URLforAPI",
+                        "type": "WebActivity",
+                        "dependsOn": [
+                            {
+                                "activity": "SetURL",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "KeyFromKeyVault",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": true
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "url": {
+                                "value": "@activity('SetURL').value",
+                                "type": "Expression"
+                            },
+                            "method": "POST",
+                            "headers": {
+                                "Authorization": {
+                                    "value": "@activity('KeyFromKEyVault').output.value",
+                                    "type": "Expression"
+                                }
+                            },
+                            "body": {}
+                        }
+                    },
+                    {
+                        "name": "WaitForcsvFile",
+                        "type": "Until",
+                        "dependsOn": [
+                            {
+                                "activity": "URLforAPI",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "KeyFromKeyVault",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "expression": {
+                                "value": "@greater(activity('pollResults').output.status,2)",
+                                "type": "Expression"
+                            },
+                            "activities": [
+                                {
+                                    "name": "Wait1",
+                                    "type": "Wait",
+                                    "dependsOn": [],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "waitTimeInSeconds": 15
+                                    }
+                                },
+                                {
+                                    "name": "pollResults",
+                                    "type": "WebActivity",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Wait1",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "policy": {
+                                        "timeout": "7.00:00:00",
+                                        "retry": 0,
+                                        "retryIntervalInSeconds": 30,
+                                        "secureOutput": false,
+                                        "secureInput": true
+                                    },
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "url": {
+                                            "value": "@activity('URLforAPI').output.reportUrl",
+                                            "type": "Expression"
+                                        },
+                                        "method": "GET",
+                                        "headers": {
+                                            "Authorization": {
+                                                "value": "@activity('KeyFromKeyVault').output.value",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "timeout": "7.00:00:00"
+                        }
+                    },
+                    {
+                        "name": "Copy data from csv to blob",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Set Blobpath",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 2,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "DelimitedTextSource",
+                                "storeSettings": {
+                                    "type": "HttpReadSettings",
+                                    "requestMethod": "GET",
+                                    "requestTimeout": "10.23:55:55"
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextReadSettings",
+                                    "skipLineCount": 1
+                                }
+                            },
+                            "sink": {
+                                "type": "DelimitedTextSink",
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageWriteSettings"
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextWriteSettings",
+                                    "quoteAllText": true,
+                                    "fileExtension": ".csv"
+                                }
+                            },
+                            "enableStaging": false
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "CSVSource",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "BlobStorageForCSVFile",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "startDate1": {
+                                        "value": "@pipeline().parameters.startDate",
+                                        "type": "Expression"
+                                    },
+                                    "endDate1": {
+                                        "value": "@pipeline().parameters.endDate",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Set Blobpath",
+                        "type": "SetVariable",
+                        "dependsOn": [
+                            {
+                                "activity": "WaitForcsvFile",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "variableName": "url",
+                            "value": {
+                                "value": "@activity('pollResults').output.blobPath",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Copy data from blob to DB",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "Copy data from csv to blob",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 2,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [
+                            {
+                                "name": "startDate2",
+                                "value": "pipeline().paramaters.startDate"
+                            },
+                            {
+                                "name": "endDate2",
+                                "value": "pipeline().paramaters.endDate"
+                            }
+                        ],
+                        "typeProperties": {
+                            "source": {
+                                "type": "DelimitedTextSource",
+                                "storeSettings": {
+                                    "type": "AzureBlobStorageReadSettings",
+                                    "recursive": true
+                                },
+                                "formatSettings": {
+                                    "type": "DelimitedTextReadSettings"
+                                }
+                            },
+                            "sink": {
+                                "type": "AzureSqlSink",
+                                "tableOption": "autoCreate",
+                                "disableMetricsCollection": true
+                            },
+                            "enableStaging": false
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "CSVFiletoTable",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "startDate2": {
+                                        "value": "@pipeline().parameters.startDate",
+                                        "type": "Expression"
+                                    },
+                                    "endDate2": {
+                                        "value": "@pipeline().parameters.endDate",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "AzureSqlTable1",
+                                "type": "DatasetReference",
+                                "parameters": {
+                                    "startDate": {
+                                        "value": "@pipeline().parameters.startDate",
+                                        "type": "Expression"
+                                    },
+                                    "endDate": {
+                                        "value": "@pipeline().parameters.endDate",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "name": "SetURL",
+                        "type": "SetVariable",
+                        "dependsOn": [],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "variableName": "url",
+                            "value": {
+                                "value": "@concat(concat(concat(concat('https://consumption.azure.com/v3/enrollments/', \nvariables('enrollmentNumber')), '/usagedetails/submit?startTime=',pipeline().parameters.startDate), '&endTime=') , pipeline().parameters.endDate)",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    {
+                        "name": "KeyFromKeyVault",
+                        "type": "WebActivity",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "url": {
+                                "value": "@variables('urlkeyvault')",
+                                "type": "Expression"
+                            },
+                            "method": "GET",
+                            "headers": {},
+                            "authentication": {
+                                "type": "MSI",
+                                "resource": "https://vault.azure.net"
+                            }
+                        }
+                    },
+                    {
+                        "name": "Execute Pipeline1",
+                        "type": "ExecutePipeline",
+                        "dependsOn": [
+                            {
+                                "activity": "Copy data from blob to DB",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "pipeline": {
+                                "referenceName": "pipelinedb",
+                                "type": "PipelineReference"
+                            },
+                            "waitOnCompletion": false,
+                            "parameters": {
+                                "startDate": {
+                                    "value": "@pipeline().parameters.startDate",
+                                    "type": "Expression"
+                                },
+                                "endDate": {
+                                    "value": "@pipeline().parameters.endDate",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "parameters": {
+                    "startDate": {
+                        "type": "string",
+                        "defaultValue": "2019-11-01"
+                    },
+                    "endDate": {
+                        "type": "string",
+                        "defaultValue": "2019-11-05"
+                    }
+                },
+                "variables": {
+                    "url": {
+                        "type": "String",
+                        "defaultValue": "''"
+                    },
+                    "startDatevar": {
+                        "type": "String",
+                        "defaultValue": "''"
+                    },
+                    "endDatevar": {
+                        "type": "String",
+                        "defaultValue": "''"
+                    },
+                    "enrollmentNumber": {
+                        "type": "String",
+                        "defaultValue": ""
+                    },
+                    "urlkeyvault": {
+                        "type": "String",
+                        "defaultValue": ""
+                    }
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/CSVSource')]",
+                "[concat(variables('factoryId'), '/datasets/BlobStorageForCSVFile')]",
+                "[concat(variables('factoryId'), '/datasets/CSVFiletoTable')]",
+                "[concat(variables('factoryId'), '/datasets/AzureSqlTable1')]",
+                "[concat(variables('factoryId'), '/pipelines/pipelinedb')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pipelineBegin')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "LookupDates",
+                        "type": "Lookup",
+                        "dependsOn": [
+                            {
+                                "activity": "Stored Procedure2",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 2,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "AzureSqlSource",
+                                "queryTimeout": "02:00:00"
+                            },
+                            "dataset": {
+                                "referenceName": "AzureSqlTable_lookup",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            },
+                            "firstRowOnly": false
+                        }
+                    },
+                    {
+                        "name": "ForEach2",
+                        "type": "ForEach",
+                        "dependsOn": [
+                            {
+                                "activity": "LookupDates",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "userProperties": [],
+                        "typeProperties": {
+                            "items": {
+                                "value": "@activity('LookupDates').output.value",
+                                "type": "Expression"
+                            },
+                            "isSequential": true,
+                            "activities": [
+                                {
+                                    "name": "Execute Pipeline2",
+                                    "type": "ExecutePipeline",
+                                    "dependsOn": [
+                                        {
+                                            "activity": "Wait1",
+                                            "dependencyConditions": [
+                                                "Succeeded"
+                                            ]
+                                        }
+                                    ],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "pipeline": {
+                                            "referenceName": "pipeline_usageData_end2end",
+                                            "type": "PipelineReference"
+                                        },
+                                        "waitOnCompletion": false,
+                                        "parameters": {
+                                            "startDate": {
+                                                "value": "@item().startDate",
+                                                "type": "Expression"
+                                            },
+                                            "endDate": {
+                                                "value": "@item().endDate",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Wait1",
+                                    "type": "Wait",
+                                    "dependsOn": [],
+                                    "userProperties": [],
+                                    "typeProperties": {
+                                        "waitTimeInSeconds": 15
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Stored Procedure2",
+                        "type": "SqlServerStoredProcedure",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "storedProcedureName": "[[dbo].[lookupDatesSP]",
+                            "storedProcedureParameters": {
+                                "endDate": {
+                                    "value": {
+                                        "value": "@pipeline().parameters.endDate1",
+                                        "type": "Expression"
+                                    },
+                                    "type": "String"
+                                },
+                                "interval": {
+                                    "value": {
+                                        "value": "@pipeline().parameters.interval",
+                                        "type": "Expression"
+                                    },
+                                    "type": "Int32"
+                                },
+                                "startDate": {
+                                    "value": {
+                                        "value": "@pipeline().parameters.startDate1",
+                                        "type": "Expression"
+                                    },
+                                    "type": "String"
+                                }
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureSqlDatabase1",
+                            "type": "LinkedServiceReference"
+                        }
+                    }
+                ],
+                "parameters": {
+                    "startDate1": {
+                        "type": "string",
+                        "defaultValue": "2019-11-01"
+                    },
+                    "endDate1": {
+                        "type": "string",
+                        "defaultValue": "2019-12-05"
+                    },
+                    "interval": {
+                        "type": "int",
+                        "defaultValue": 5
+                    }
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/datasets/AzureSqlTable_lookup')]",
+                "[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]",
+                "[concat(variables('factoryId'), '/pipelines/pipeline_usageData_end2end')]"
+            ]
+        },
+        {
+            "name": "[concat(parameters('factoryName'), '/pipelinedb')]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Stored Procedure1",
+                        "type": "SqlServerStoredProcedure",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "storedProcedureName": "[[dbo].[loadUsageDataToFinalTbl]",
+                            "storedProcedureParameters": {
+                                "endDate": {
+                                    "value": {
+                                        "value": "@pipeline().parameters.endDate",
+                                        "type": "Expression"
+                                    },
+                                    "type": "String"
+                                },
+                                "startDate": {
+                                    "value": {
+                                        "value": "@pipeline().parameters.startDate",
+                                        "type": "Expression"
+                                    },
+                                    "type": "String"
+                                },
+                                "stagetblname": {
+                                    "value": {
+                                        "value": "@concat(concat('usageDetailsStaging',pipeline().parameters.startDate),pipeline().parameters.endDate)",
+                                        "type": "Expression"
+                                    },
+                                    "type": "String"
+                                }
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "AzureSqlDatabase1",
+                            "type": "LinkedServiceReference"
+                        }
+                    }
+                ],
+                "parameters": {
+                    "startDate": {
+                        "type": "string",
+                        "defaultValue": "2019-11-01"
+                    },
+                    "endDate": {
+                        "type": "string",
+                        "defaultValue": "2019-11-01"
+                    },
+                    "stagetblname": {
+                        "type": "string",
+                        "defaultValue": "usageDetails"
+                    }
+                },
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(variables('factoryId'), '/linkedServices/AzureSqlDatabase1')]"
+            ]
+        }
+    ]
+}

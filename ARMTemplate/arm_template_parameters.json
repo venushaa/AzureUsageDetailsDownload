@@ -1,0 +1,33 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "factoryName": {
+            "value": "usagedetails-df"
+        },
+        "AzureBlobStorage1_connectionString": {
+            "value": ""
+        },
+        "AzureSqlDatabase1_connectionString": {
+            "value": ""
+        },
+        "trigger1UsageDetails_properties_pipeline_usageData_end2end_parameters_startDate": {
+            "value": "2019-11-10"
+        },
+        "trigger1UsageDetails_properties_pipeline_usageData_end2end_parameters_endDate": {
+            "value": "2019-11-10"
+        },
+        "trigger2UsageDetails_properties_pipelineBegin_parameters_startDate1": {
+            "value": "12/1/2019"
+        },
+        "trigger2UsageDetails_properties_pipelineBegin_parameters_endDate1": {
+            "value": "12/1/2019"
+        },
+        "trigger2UsageDetails_properties_pipelineBegin_parameters_interval": {
+            "value": 4
+        },
+        "HttpServer1_properties_typeProperties_url": {
+            "value": "@activity('Set Blobpath').value"
+        }
+    }
+}
